@@ -1,0 +1,5 @@
+aiohttp[speedups]
+click
+ipdb
+requests
+beautifulsoup4

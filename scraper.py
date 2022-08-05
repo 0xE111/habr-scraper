@@ -9,7 +9,9 @@ from tqdm import tqdm
 
 from habr import Habr
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger(__name__)
+
 DATA_DIR = Path('data')
 
 POSTS_LIST_PATH = DATA_DIR / 'posts.jsonl'
@@ -26,17 +28,14 @@ def fetch_posts(posts_list_path: Path = POSTS_LIST_PATH):
             out_file.flush()
 
 
-def count_python_posts(posts_list_path: Path = POSTS_LIST_PATH) -> int:
-    with posts_list_path.open('r') as in_file:
-        return sum(1 for _ in in_file)
-
-
-def iter_python_posts(posts_list_path: Path = POSTS_LIST_PATH) -> Iterator[dict]:
+def iter_posts(posts_list_path: Path = POSTS_LIST_PATH) -> Iterator[dict]:
     with posts_list_path.open('r') as in_file:
         for line in in_file:
-            post = json.loads(line)
-            if any(hub['alias'] == 'python' for hub in post['hubs']):
-                yield post
+            yield json.loads(line)
+
+
+def get_metadata_mapping(posts_list_path: Path = POSTS_LIST_PATH) -> dict[int, str]:
+    return {int(post['id']): post for post in iter_posts()}
 
 
 def extract_python_code_snippets(content: BeautifulSoup) -> list[str]:
@@ -58,15 +57,20 @@ def process_post(post_id: int | str, posts_dir: Path = POSTS_DIR):
     out_file.write_text(SNIPPETS_DELIMITER.join(codes))
 
 
+def iter_python_posts(posts_list_path: Path = POSTS_LIST_PATH) -> Iterator[dict]:
+    for post in iter_posts(posts_list_path):
+        if any(hub['alias'] == 'python' for hub in post['hubs']):
+            yield post
+
+
 def download_python_snippets(posts_dir: Path = POSTS_DIR, num_threads: Optional[int] = None):
     posts_dir.mkdir(exist_ok=True)
-    num_posts = count_python_posts()
     with ThreadPoolExecutor(max_workers=num_threads) as pool:
         futures = [
             pool.submit(process_post, post['id'], posts_dir)
-            for post in tqdm(iter_python_posts(), total=num_posts, desc='submitting jobs')
+            for post in tqdm(iter_python_posts(), desc='submitting jobs')
         ]
-        for _ in tqdm(as_completed(futures), total=num_posts, desc='processing posts'):
+        for _ in tqdm(as_completed(futures), desc='processing posts'):
             pass
 
 

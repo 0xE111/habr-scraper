@@ -17,10 +17,16 @@ class TooManyIterations(Exception):
 @dataclass
 class Habr:
     session: requests.Session = field(default_factory=requests.Session)
+    adapter: requests.adapters.HTTPAdapter = requests.adapters.HTTPAdapter(
+        pool_maxsize=32,
+    )
 
     SITE_URL: ClassVar[str] = 'https://habr.com'
     API_URL: ClassVar[str] = 'https://habr.com/kek/v2'
     TIMEOUT: ClassVar[int] = 10
+
+    def __post_init__(self):
+        self.session.mount('https://', self.adapter)
 
     @retry(
         reraise=True,
